@@ -11,6 +11,7 @@ tee =    '├── '
 last =   '└── '
 
 LARGE_FILE_SIZE = 1000000
+SPLIT_SIZE = 4000000 # 4 MB
 
 def get_ignore_list(ignore_file_path):
     ignore_list = []
@@ -104,17 +105,47 @@ def tree(dir_path: Path, level: int = -1, limit_to_directories: bool = False,
         print(f"... length_limit, {length_limit}, reached, counted:")
     print(f'\n{directories} directories' + (f', {files} files' if files else ''))
 
+def split_file(file_path):
+    # Read from the input file
+    # and split into chunks that are less than SPLIT_SIZE
+    # Do the split on the separator "- * 4" to ensure that the chunks are valid
+    # Combine the chunks together until the total size is less than SPLIT_SIZE
+    # Then write all the combined chunks to a new file. Repeat until all chunks are written.
+    with open(file_path, 'r') as input_file:
+        chunks = []
+        chunk = ""
+        chunk_size = 0
+        for line in input_file:
+            if line.startswith("-" * 4):
+                if chunk_size > SPLIT_SIZE:
+                    chunks.append(chunk)
+                    chunk = ""
+                    chunk_size = 0
+                chunk += line
+                chunk_size += len(line)
+            else:
+                chunk += line
+                chunk_size += len(line)
+        chunks.append(chunk)
+    for i, chunk in enumerate(chunks):
+        with open(f"{file_path[:-4]}_{i}.txt", 'w') as output_file:
+            output_file.write(chunk)
+        print(f"Chunk {i} written to {file_path[:-4]}_{i}.txt")
+    print(f"All chunks written.")
+        
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("""Usage: python git_to_text.py /path/to/git/repository 
               -p /path/to/preamble.txt
               -o /path/to/output_file.txt
               -l list all files to be included with ignored files in gray 
-              -v verbose output""")
+              -v verbose output
+              -s split output into multiple files""")
         sys.exit(1)
         
     verbose = False
     exclude_large_files = False
+    split_output = False
 
     repo_path = sys.argv[1]
     ignore_file_path = os.path.join(repo_path, ".gptignore")
@@ -147,6 +178,9 @@ if __name__ == "__main__":
 
     if "-x" in sys.argv:
         exclude_large_files = True
+        
+    if "-s" in sys.argv:
+        split_output = True
 
     with open(output_file_path, 'w') as output_file:
         if preamble_file:
@@ -158,5 +192,8 @@ if __name__ == "__main__":
         process_repository(repo_path, ignore_list, output_file, verbose, exclude_large_files)
     with open(output_file_path, 'a') as output_file:
         output_file.write("--END--")
-    print(f"Repository contents written to {output_file_path}.")
-    
+        
+    if split_output:
+        split_file(output_file_path)
+    else:
+        print(f"Repository contents written to {output_file_path}.")
