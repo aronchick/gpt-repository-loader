@@ -16,3 +16,14 @@ LICENSE
 *.jpeg
 *.jpg
 *bin/*
+
+terraform.tfstate*
+*.terraform/*
+*.lock
+*.DS_Store*
+*cache*
+*.venv*
+*.svg
+*videos/*
+*weights/*
+
